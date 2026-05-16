@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User persona data and knowledge state for BKT model.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "gender": { "type": "string" },
+        "gpa": { "type": "number" },
+        "preScores": { "type": "object" },
+        "classesTaken": { "type": "array" },
+        "knowledgeState": { "type": "object", "description": "Mapping of concept IDs to p(L) probabilities." },
+        "streak": { "type": "integer" },
+        "totalCoins": { "type": "integer" },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Question": {
+      "title": "Question Bank",
+      "description": "Synthetic questions cloned from official standards.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "options": { "type": "array" },
+        "correctAnswerIndex": { "type": "integer" },
+        "conceptId": { "type": "string" },
+        "difficulty": { "type": "integer", "description": "1 (easy) to 5 (extreme)" },
+        "strategyTip": { "type": "string", "description": "AI-generated 5-second speed hack." },
+        "trickPattern": { "type": "string", "description": "Description of the 'trap' in this question." },
+        "syntheticDisclosed": { "type": "boolean" }
+      },
+      "required": ["id", "text", "options", "correctAnswerIndex", "conceptId"]
+    },
+    "ProgressEntry": {
+      "title": "User Progress",
+      "description": "Log of a single question attempt.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "questionId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isCorrect": { "type": "boolean" },
+        "timeSpentMs": { "type": "integer" },
+        "pointsEarned": { "type": "integer" }
+      },
+      "required": ["userId", "questionId", "isCorrect"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stored user profile and persona modeling."
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "The 'Mirror Bank' of synthetic SAT/ACT questions."
+    },
+    "/progress/{progressId}": {
+      "schema": "ProgressEntry",
+      "description": "Global activity logs for analytics and reward triggers."
+    }
+  }
+}

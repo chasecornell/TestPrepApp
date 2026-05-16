@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email'])
+          && data.uid == request.auth.uid
+          && data.email is string && data.email.size() <= 256
+          && (data.get('displayName', '') is string && data.get('displayName', '').size() <= 128)
+          && (data.get('streak', 0) is int)
+          && (data.get('streakFreezeCount', 0) is int)
+          && (data.get('xp', 0) is int)
+          && (data.get('level', 1) is int)
+          && (data.get('dailyGoal', 'STANDARD') in ['LIGHT', 'STANDARD', 'SERIOUS', 'INTENSIVE'])
+          && (data.get('dailyProgress', 0) is int)
+          && (data.get('badges', []) is list)
+          && (data.get('mistakeBank', []) is list)
+          && (data.get('completedLessons', []) is list)
+          && (data.get('totalQuestionsCompleted', 0) is int);
+    }
+
+    function isValidProgress(data) {
+      return data.keys().hasAll(['userId', 'questionId', 'isCorrect'])
+          && data.userId == request.auth.uid
+          && data.questionId is string && data.questionId.size() <= 128
+          && data.isCorrect is bool
+          && (data.get('timeSpentMs', 0) is int)
+          && (data.get('pointsEarned', 0) is int);
+    }
+
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['id', 'text', 'options', 'correctAnswerIndex', 'conceptId', 'difficulty', 'strategyTip', 'syntheticDisclosed'])
+          && data.id is string
+          && data.text is string
+          && data.options is list
+          && data.correctAnswerIndex is int
+          && data.conceptId is string
+          && data.difficulty is int
+          && data.strategyTip is string
+          && data.syntheticDisclosed is bool
+          && (data.get('trickPattern', '') is string);
+    }
+
+    // --- Rules for Collections ---
+
+    // Users: Private by default, owner can manage.
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming())
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'gender', 'gpa', 'preScores', 'classesTaken', 'knowledgeState', 'streak', 'streakFreezeCount', 'xp', 'level', 'dailyGoal', 'dailyProgress', 'badges', 'mistakeBank', 'completedLessons', 'totalQuestionsCompleted', 'lastActive']);
+      allow delete: if false; // Users shouldn't delete profiles via client easily
+    }
+
+    // Questions: Public read for signed-in users
+    match /questions/{questionId} {
+      allow get: if isSignedIn() && isValidId(questionId);
+      allow list: if isSignedIn(); // Demo purposes, typically filter server side
+      allow create: if isSignedIn() && isValidQuestion(incoming());
+      allow update, delete: if false;
+    }
+
+    // Progress: Owner can read/list and create.
+    match /progress/{progressId} {
+      allow get: if isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidProgress(incoming()) && isValidId(progressId);
+      allow update, delete: if false; // Progress records are immutable once written
+    }
+  }
+}

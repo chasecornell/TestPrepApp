@@ -1,0 +1,6 @@
+{
+  "name": "Velocity Prep",
+  "description": "AI-powered TikTok-style micro-learning for SAT/ACT dominance with predictive persona modeling and speed-hack strategy engines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
