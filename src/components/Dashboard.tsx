@@ -172,8 +172,8 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
               title="MATH"
               accentColor="bg-neon-cyan"
               nodes={[
-                { id: 'alg1', title: 'Linear Eq', status: 'completed' },
-                { id: 'alg2', title: 'Functions', status: 'current' },
+                { id: 'alg1', title: 'Linear Eq', status: 'current' },
+                { id: 'alg2', title: 'Functions', status: 'locked' },
                 { id: 'alg3', title: 'Quadratics', status: 'locked' },
                 { id: 'geom1', title: 'Geometry', status: 'locked' },
               ]}
@@ -183,8 +183,8 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
               title="READING & WRITING"
               accentColor="bg-neon-pink"
               nodes={[
-                { id: 'rw1', title: 'Punctuation', status: 'completed' },
-                { id: 'rw2', title: 'Evidence', status: 'current' },
+                { id: 'rw1', title: 'Punctuation', status: 'current' },
+                { id: 'rw2', title: 'Evidence', status: 'locked' },
                 { id: 'rw3', title: 'Transitions', status: 'locked' },
               ]}
             />

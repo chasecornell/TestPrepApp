@@ -3,13 +3,13 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp } from 'lucide-react';
 
 const MOCK_DATA = [
-  { day: 'Mon', questions: 12 },
-  { day: 'Tue', questions: 18 },
-  { day: 'Wed', questions: 5 },
-  { day: 'Thu', questions: 25 },
-  { day: 'Fri', questions: 15 },
-  { day: 'Sat', questions: 32 },
-  { day: 'Sun', questions: 20 },
+  { day: 'Mon', questions: 0 },
+  { day: 'Tue', questions: 0 },
+  { day: 'Wed', questions: 0 },
+  { day: 'Thu', questions: 0 },
+  { day: 'Fri', questions: 0 },
+  { day: 'Sat', questions: 0 },
+  { day: 'Sun', questions: 0 },
 ];
 
 export default function WeeklyProgressChart() {
