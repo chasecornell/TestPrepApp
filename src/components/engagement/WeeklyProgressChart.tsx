@@ -38,7 +38,7 @@ export default function WeeklyProgressChart() {
       </div>
 
       <div className="h-48 w-full min-h-[192px]">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
           <LineChart data={MOCK_DATA}>
             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
             <XAxis 
