@@ -71,19 +71,20 @@ export function updateStreak(lastActive: string, currentStreak: number, streakFr
   }
 }
 
-export function estimateSATScore(accuracy: number, totalQuestions: number): { reading: number, math: number, total: number } {
+export function estimateScores(accuracy: number, totalQuestions: number): { sat: number, act: number } {
   // Very rough estimation for motivational purposes
-  // Base score 400 (200 + 200)
-  // Max score 1600
-  
   // Accuracy weight 70%, volume weight 30%
   const volumeFactor = Math.min(1, totalQuestions / 1000);
   const mastery = (accuracy * 0.7) + (volumeFactor * 0.3);
   
-  const reading = 200 + Math.round(mastery * 600);
-  const math = 200 + Math.round(mastery * 600);
+  const satReading = 200 + Math.round(mastery * 600);
+  const satMath = 200 + Math.round(mastery * 600);
+  const sat = satReading + satMath;
   
-  return { reading, math, total: reading + math };
+  // ACT Max 36, Base 1
+  const act = 1 + Math.round(mastery * 35);
+  
+  return { sat, act };
 }
 
 export function checkStreakMilestones(streak: number, currentBadges: string[]): { newBadges: string[], xpReward: number } {

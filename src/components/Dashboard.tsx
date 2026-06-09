@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { UserProfile } from '../types';
-import { Target, Trophy, TrendingUp, ChevronRight, BookOpen, Brain, Sparkles, Calculator, BookMarked, PenLine } from 'lucide-react';
+import { Target, Trophy, TrendingUp, ChevronRight, BookOpen, Brain, Sparkles, Calculator, BookMarked, PenLine, Microscope } from 'lucide-react';
 import XPProgressBar from './engagement/XPProgressBar';
 import StreakFlame from './engagement/StreakFlame';
 import DailyGoalCard from './engagement/DailyGoalCard';
@@ -11,7 +11,7 @@ import MistakeBank from './engagement/MistakeBank';
 import StreakMilestonesCard from './engagement/StreakMilestonesCard';
 import WeeklyProgressChart from './engagement/WeeklyProgressChart';
 import LeaderboardCard from './engagement/LeaderboardCard';
-import { getXPForNextLevel, estimateSATScore } from '../services/gamificationService';
+import { getXPForNextLevel, estimateScores } from '../services/gamificationService';
 
 interface Props {
   user: UserProfile;
@@ -49,6 +49,15 @@ const SECTIONS = [
     iconColor: 'text-black',
     badge: 'Language Core',
   },
+  {
+    id: 'science',
+    label: 'SCIENCE',
+    sub: 'Data · Experiments · Models',
+    icon: Microscope,
+    gradient: 'from-neon-green to-emerald-600',
+    iconColor: 'text-black',
+    badge: 'ACT Mode',
+  },
 ];
 
 export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenMistakes, onOpenProfile }: Props) {
@@ -60,7 +69,7 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
     label: id.charAt(0).toUpperCase() + id.slice(1).replace('_', ' ')
   }));
 
-  const estimatedScore = estimateSATScore(
+  const estimatedScore = estimateScores(
     concepts.reduce((acc, c) => acc + c.prob, 0) / (concepts.length || 1),
     user.totalQuestionsCompleted
   );
@@ -82,20 +91,16 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
              <Sparkles className="w-12 h-12 text-neon-yellow" />
           </div>
           <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Estimated SAT Score</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Estimated SAT</div>
             <div className="text-3xl font-black text-neon-yellow tracking-tighter">
-              {estimatedScore.total}
+              {estimatedScore.sat}
             </div>
           </div>
           <div className="h-10 w-px bg-white/10" />
           <div className="flex gap-4">
             <div>
-              <div className="text-[8px] font-black uppercase tracking-widest text-gray-500">R&W</div>
-              <div className="font-bold text-sm text-white">{estimatedScore.reading}</div>
-            </div>
-            <div>
-              <div className="text-[8px] font-black uppercase tracking-widest text-gray-500">Math</div>
-              <div className="font-bold text-sm text-white">{estimatedScore.math}</div>
+              <div className="text-[8px] font-black uppercase tracking-widest text-gray-500">ACT</div>
+              <div className="font-bold text-xl text-white mt-1">{estimatedScore.act}</div>
             </div>
           </div>
         </div>
@@ -111,7 +116,7 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
           />
 
           {/* Section Selector */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {SECTIONS.map(s => {
               const SIcon = s.icon;
               const isActive = activeSection === s.id;
@@ -120,13 +125,13 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
                   key={s.id}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setActiveSection(s.id)}
-                  className={`relative rounded-2xl p-4 flex sm:flex-col items-center sm:items-start text-left border transition-all duration-200 ${
+                  className={`relative rounded-2xl p-4 flex flex-col items-start text-left border transition-all duration-200 ${
                     isActive
                       ? `bg-gradient-to-br ${s.gradient} border-transparent`
                       : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }`}
                 >
-                  <SIcon className={`w-5 h-5 sm:mb-2 mr-3 sm:mr-0 ${isActive ? 'text-black' : 'text-gray-400'}`} />
+                  <SIcon className={`w-6 h-6 mb-3 ${isActive ? 'text-black' : 'text-gray-400'}`} />
                   <div className="flex-1">
                     <div className={`text-xs font-black uppercase tracking-widest ${isActive ? 'text-black' : 'text-white'}`}>
                       {s.label}
@@ -186,6 +191,16 @@ export default function Dashboard({ user, onStartSession, onOpenLibrary, onOpenM
                 { id: 'rw1', title: 'Punctuation', status: 'current' },
                 { id: 'rw2', title: 'Evidence', status: 'locked' },
                 { id: 'rw3', title: 'Transitions', status: 'locked' },
+              ]}
+            />
+            
+            <LearningPath
+              title="SCIENCE (ACT)"
+              accentColor="bg-neon-green"
+              nodes={[
+                { id: 'sci1', title: 'Data Rep', status: 'current' },
+                { id: 'sci2', title: 'Research Exp', status: 'locked' },
+                { id: 'sci3', title: 'Conflicting Viewpoints', status: 'locked' },
               ]}
             />
           </div>

@@ -6,6 +6,7 @@ import { UserProfile, Question } from './types';
 import PersonaOnboarding from './components/PersonaOnboarding';
 import Dashboard from './components/Dashboard';
 import QuestionView from './components/QuestionView';
+import SessionCompleteView from './components/SessionCompleteView';
 import QuestionBank from './components/QuestionBank';
 import MistakeBankView from './components/MistakeBankView';
 import ProfileSettings from './components/ProfileSettings';
@@ -16,7 +17,7 @@ import { calculateXPGain, checkLevelUp, updateStreak, getXPForNextLevel, checkSt
 import { Target, Zap, LogIn, Library, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-type AppState = 'LOADING' | 'AUTH' | 'ONBOARDING' | 'DASHBOARD' | 'SESSION' | 'LIBRARY' | 'MISTAKES' | 'PROFILE';
+type AppState = 'LOADING' | 'AUTH' | 'ONBOARDING' | 'DASHBOARD' | 'SESSION' | 'SESSION_COMPLETE' | 'LIBRARY' | 'MISTAKES' | 'PROFILE';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('LOADING');
@@ -25,11 +26,13 @@ export default function App() {
   const [showBadgeName, setShowBadgeName] = useState<string | null>(null);
   const [currentSessionQuestions, setCurrentSessionQuestions] = useState<Question[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
+  const [sessionTotalTimeMs, setSessionTotalTimeMs] = useState(0);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState(0);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -177,29 +180,28 @@ export default function App() {
     }
   };
 
-  // section: 'math' | 'reading' | 'english_grammar'
+  // section: 'math' | 'reading' | 'english_grammar' | 'science'
   const startSession = async (section: string = 'math') => {
-    console.log('[startSession] triggered for section:', section);
     setAppState('LOADING');
     try {
-      const qs = await fetchExternalQuestions(section, 20);
-      console.log('[startSession] fetched qs:', qs);
-      if (!qs || qs.length === 0) {
-        console.error('[startSession] No questions returned, throwing error');
-        throw new Error('No questions returned from API');
-      }
+      // Fetch 5 questions per session so they cycle from the larger pool
+      const qs = await fetchExternalQuestions(section, 5);
+      if (qs.length === 0) throw new Error('No questions returned from API');
       setCurrentSessionQuestions(qs);
       setQuestionIndex(0);
+      setSessionTotalTimeMs(0);
+      setSessionStartTime(Date.now());
       setAppState('SESSION');
-      console.log('[startSession] Transitioned to SESSION');
     } catch (error) {
-      console.error('Failed to start session in App:', error);
+      console.error('Failed to start session:', error);
       setAppState('DASHBOARD');
     }
   };
 
   const handleAnswer = async (correct: boolean, timeSpentMs: number) => {
     if (!profile || !currentUser) return;
+
+    setSessionTotalTimeMs(prev => prev + timeSpentMs);
 
     const currentQ = currentSessionQuestions[questionIndex];
     if (!currentQ) return;
@@ -268,15 +270,14 @@ export default function App() {
     } catch (error) {
       handleFirestoreError(error, 'update', `users/${currentUser.uid}`);
     }
+  };
 
-    // Move to next question or dashboard
-    setTimeout(() => {
-      if (questionIndex < currentSessionQuestions.length - 1) {
-        setQuestionIndex(i => i + 1);
-      } else {
-        setAppState('DASHBOARD');
-      }
-    }, 2000);
+  const handleNextQuestion = () => {
+    if (questionIndex < currentSessionQuestions.length - 1) {
+      setQuestionIndex(i => i + 1);
+    } else {
+      setAppState('SESSION_COMPLETE');
+    }
   };
 
   const handleMistakeResolved = async (questionId: string) => {
@@ -492,12 +493,26 @@ export default function App() {
           </motion.div>
         );
       case 'SESSION':
-        if (!currentSessionQuestions[questionIndex]) return null;
+        const currentQ = currentSessionQuestions[questionIndex];
+        if (!currentQ) return null;
         return (
           <motion.div key="session" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <QuestionView
-              question={currentSessionQuestions[questionIndex]}
+              key={currentQ.id}
+              question={currentQ}
+              sessionStartTime={sessionStartTime}
               onAnswer={handleAnswer}
+              onNext={handleNextQuestion}
+            />
+          </motion.div>
+        );
+      case 'SESSION_COMPLETE':
+        return (
+          <motion.div key="session_complete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <SessionCompleteView
+              totalTimeMs={sessionTotalTimeMs}
+              questionCount={currentSessionQuestions.length}
+              onExit={() => setAppState('DASHBOARD')}
             />
           </motion.div>
         );

@@ -1,26 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Question } from '../types';
-import { Zap, AlertTriangle, FastForward, Sparkles } from 'lucide-react';
+import { Zap, AlertTriangle, FastForward, Sparkles, Clock } from 'lucide-react';
 import { calculateXPGain } from '../services/gamificationService';
 
 interface Props {
   question: Question;
+  sessionStartTime: number;
   onAnswer: (correct: boolean, timeTaken: number) => void;
+  onNext: () => void;
 }
 
-export default function QuestionView({ question, onAnswer }: Props) {
+export default function QuestionView({ question, sessionStartTime, onAnswer, onNext }: Props) {
   const [startTime] = useState(Date.now());
   const [selected, setSelected] = useState<number | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60); // 60s per micro-task
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [sessionTimeElapsed, setSessionTimeElapsed] = useState(Date.now() - sessionStartTime);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(t => Math.max(0, t - 1));
-    }, 1000);
+    let timer: number;
+    if (!isRevealed) {
+      timer = window.setInterval(() => {
+        setTimeElapsed(t => t + 1);
+        setSessionTimeElapsed(Date.now() - sessionStartTime);
+      }, 1000);
+    }
     return () => clearInterval(timer);
-  }, []);
+  }, [isRevealed, sessionStartTime]);
 
   const handleSelect = (idx: number) => {
     if (isRevealed) return;
@@ -36,15 +43,34 @@ export default function QuestionView({ question, onAnswer }: Props) {
 
   const [xpAwarded, setXpAwarded] = useState<number | null>(null);
 
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-6">
-      {/* Velocity Bar */}
-      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-        <motion.div 
-          initial={{ width: '100%' }}
-          animate={{ width: `${(timeLeft / 60) * 100}%` }}
-          className={`h-full ${timeLeft < 10 ? 'bg-neon-pink' : 'bg-neon-cyan'}`}
-        />
+      {/* Velocity Bar / Time elapsed */}
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 text-neon-cyan bg-neon-cyan/10 px-3 py-1.5 rounded-lg border border-neon-cyan/20">
+            <Clock className="w-4 h-4" />
+            <span className="font-mono font-bold text-sm tracking-wider">Q: {formatTime(timeElapsed)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-neon-pink bg-neon-pink/10 px-3 py-1.5 rounded-lg border border-neon-pink/20">
+            <Clock className="w-4 h-4" />
+            <span className="font-mono font-bold text-sm tracking-wider">TOTAL: {formatTime(Math.floor(sessionTimeElapsed / 1000))}</span>
+          </div>
+        </div>
+        <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden relative hidden sm:block">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min((timeElapsed / 60) * 100, 100)}%` }}
+            className="h-full bg-neon-cyan"
+            transition={{ ease: "linear", duration: 1 }}
+          />
+        </div>
       </div>
 
       <motion.div 
@@ -60,7 +86,7 @@ export default function QuestionView({ question, onAnswer }: Props) {
           <span className="text-gray-500 font-mono text-[10px] sm:text-xs">V-LVL: {question.difficulty}</span>
         </div>
 
-        <h3 className="text-lg sm:text-xl font-medium mb-6 sm:mb-8 leading-relaxed">
+        <h3 className="text-lg sm:text-xl font-medium mb-6 sm:mb-8 leading-relaxed whitespace-pre-wrap">
           {question.text}
         </h3>
 
@@ -134,6 +160,13 @@ export default function QuestionView({ question, onAnswer }: Props) {
                 </div>
               )}
             </div>
+
+            <button
+              onClick={onNext}
+              className="w-full mt-4 py-4 btn-primary flex justify-center items-center font-bold tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(0,243,255,0.3)] hover:scale-[1.02]"
+            >
+              CONTINUE TO NEXT
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
