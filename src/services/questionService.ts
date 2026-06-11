@@ -375,6 +375,56 @@ export async function enrichQuestionWithAI(question: Question): Promise<Question
   }
 }
 
+export async function getRemediation(concept: string, recentMistakes: Question[]) {
+  try {
+    const res = await fetch("/api/questions/remediate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ concept, recentMistakes }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    
+    // Map the returned reviewQuestion into a full Question
+    if (data.reviewQuestion) {
+       data.reviewQuestion = {
+         id: 'remediation-' + Math.random().toString(36).substr(2, 9),
+         ...data.reviewQuestion,
+         conceptId: concept,
+         difficulty: 1, // Remediation is always easy
+         syntheticDisclosed: true
+       };
+    }
+    return data; // { remediationText: string, reviewQuestion: Question }
+  } catch (error) {
+    console.error("Remediation failed:", error);
+    return null;
+  }
+}
+
+export async function getHarderQuestion(concept: string, currentDifficulty: number) {
+  try {
+    const res = await fetch("/api/questions/generate-harder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ concept, currentDifficulty }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    
+    return {
+      id: 'harder-' + Math.random().toString(36).substr(2, 9),
+      ...data,
+      conceptId: concept,
+      difficulty: currentDifficulty + 1,
+      syntheticDisclosed: true
+    } as Question;
+  } catch (error) {
+    console.error("Harder question generation failed:", error);
+    return null;
+  }
+}
+
 // Seed function for demo
 export async function seedDemoQuestions() {
   const demoQuestions: Question[] = [

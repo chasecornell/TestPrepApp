@@ -5,13 +5,14 @@ import { Zap, AlertTriangle, FastForward, Sparkles, Clock } from 'lucide-react';
 import { calculateXPGain } from '../services/gamificationService';
 
 interface Props {
-  question: Question;
+  question: Question & { remediationText?: string, isRemediation?: boolean };
   sessionStartTime: number;
   onAnswer: (correct: boolean, timeTaken: number) => void;
   onNext: () => void;
+  isGenerating?: boolean;
 }
 
-export default function QuestionView({ question, sessionStartTime, onAnswer, onNext }: Props) {
+export default function QuestionView({ question, sessionStartTime, onAnswer, onNext, isGenerating }: Props) {
   const [startTime] = useState(Date.now());
   const [selected, setSelected] = useState<number | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -80,11 +81,23 @@ export default function QuestionView({ question, sessionStartTime, onAnswer, onN
         className="card-glass border-neon-cyan/20 p-5 sm:p-8"
       >
         <div className="flex justify-between items-start mb-4 sm:mb-6">
-          <span className="px-3 py-1 bg-neon-cyan/10 text-neon-cyan text-[10px] font-bold tracking-widest rounded-full uppercase border border-neon-cyan/20">
-            {question.conceptId.replace('_', ' ')}
+          <span className={`px-3 py-1 ${question.isRemediation ? 'bg-neon-pink/10 text-neon-pink border-neon-pink/20' : 'bg-neon-cyan/10 text-neon-cyan border-neon-cyan/20'} text-[10px] font-bold tracking-widest rounded-full uppercase border`}>
+            {question.isRemediation ? 'AI REVIEW: ' + question.conceptId.replace('_', ' ') : question.conceptId.replace('_', ' ')}
           </span>
           <span className="text-gray-500 font-mono text-[10px] sm:text-xs">V-LVL: {question.difficulty}</span>
         </div>
+
+        {question.remediationText && (
+          <div className="mb-6 p-4 bg-neon-pink/5 border border-neon-pink/20 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-4 h-4 text-neon-pink" />
+              <span className="text-[10px] font-black uppercase text-neon-pink tracking-widest">Remediation Analysis</span>
+            </div>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              {question.remediationText}
+            </p>
+          </div>
+        )}
 
         <h3 className="text-lg sm:text-xl font-medium mb-6 sm:mb-8 leading-relaxed whitespace-pre-wrap">
           {question.text}
@@ -163,9 +176,15 @@ export default function QuestionView({ question, sessionStartTime, onAnswer, onN
 
             <button
               onClick={onNext}
-              className="w-full mt-4 py-4 btn-primary flex justify-center items-center font-bold tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(0,243,255,0.3)] hover:scale-[1.02]"
+              disabled={isGenerating}
+              className={`w-full mt-4 py-4 btn-primary flex justify-center items-center font-bold tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(0,243,255,0.3)] hover:scale-[1.02] ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              CONTINUE TO NEXT
+              {isGenerating ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  ADAPTING DIFFICULTY...
+                </>
+              ) : 'CONTINUE TO NEXT'}
             </button>
           </motion.div>
         )}

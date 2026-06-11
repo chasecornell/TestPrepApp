@@ -12,7 +12,7 @@ import MistakeBankView from './components/MistakeBankView';
 import ProfileSettings from './components/ProfileSettings';
 import MilestoneToast from './components/engagement/MilestoneToast';
 import { updateKnowledgeState } from './services/bktService';
-import { fetchExternalQuestions } from './services/questionService';
+import { fetchExternalQuestions, getRemediation, getHarderQuestion } from './services/questionService';
 import { calculateXPGain, checkLevelUp, updateStreak, getXPForNextLevel, checkStreakMilestones } from './services/gamificationService';
 import { Target, Zap, LogIn, Library, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,10 +25,6 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [showBadgeName, setShowBadgeName] = useState<string | null>(null);
   const [currentSessionQuestions, setCurrentSessionQuestions] = useState<Question[]>([]);
-  const [sessionQuestionPool, setSessionQuestionPool] = useState<Question[]>([]);
-  const [sessionConsecutiveCorrect, setSessionConsecutiveCorrect] = useState(0);
-  const [sessionConsecutiveIncorrect, setSessionConsecutiveIncorrect] = useState(0);
-  const [sessionTargetDifficulty, setSessionTargetDifficulty] = useState(2);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [sessionTotalTimeMs, setSessionTotalTimeMs] = useState(0);
 
@@ -37,6 +33,10 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState(0);
+
+  const [consecutiveMisses, setConsecutiveMisses] = useState(0);
+  const [consecutiveHits, setConsecutiveHits] = useState(0);
+  const [isGeneratingRemediation, setIsGeneratingRemediation] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -188,32 +188,15 @@ export default function App() {
   const startSession = async (section: string = 'math') => {
     setAppState('LOADING');
     try {
-      // Fetch a larger pool of questions for adaptive selection
-      const pool = await fetchExternalQuestions(section, 50);
-      if (pool.length === 0) throw new Error('No questions returned from API');
-      
-      setSessionQuestionPool(pool);
-      const initialDiff = 2; // Start with a medium difficulty
-      
-      // Select the first question based on difficulty match and lowest BKT mastery
-      const sortedPool = [...pool].sort((a, b) => {
-        const diffMatchA = Math.abs((a.difficulty || 1) - initialDiff);
-        const diffMatchB = Math.abs((b.difficulty || 1) - initialDiff);
-        const probA = profile?.knowledgeState[a.conceptId] || 0.5;
-        const probB = profile?.knowledgeState[b.conceptId] || 0.5;
-        if (diffMatchA !== diffMatchB) return diffMatchA - diffMatchB;
-        return probA - probB;
-      });
-      
-      const firstQ = sortedPool[0];
-
-      setCurrentSessionQuestions([firstQ]);
+      // Fetch 5 questions per session so they cycle from the larger pool
+      const qs = await fetchExternalQuestions(section, 5);
+      if (qs.length === 0) throw new Error('No questions returned from API');
+      setCurrentSessionQuestions(qs);
       setQuestionIndex(0);
       setSessionTotalTimeMs(0);
       setSessionStartTime(Date.now());
-      setSessionConsecutiveCorrect(0);
-      setSessionConsecutiveIncorrect(0);
-      setSessionTargetDifficulty(initialDiff);
+      setConsecutiveMisses(0);
+      setConsecutiveHits(0);
       setAppState('SESSION');
     } catch (error) {
       console.error('Failed to start session:', error);
@@ -232,23 +215,6 @@ export default function App() {
     // 1. Update BKT Knowledge State
     const currentProb = profile.knowledgeState[currentQ.conceptId] || 0.5;
     const nextProb = updateKnowledgeState(currentProb, correct);
-
-    // Track consecutive correct/incorrect for adaptive difficulty
-    let newConsecutiveCorrect = correct ? sessionConsecutiveCorrect + 1 : 0;
-    let newConsecutiveIncorrect = correct ? 0 : sessionConsecutiveIncorrect + 1;
-    let newTargetDifficulty = sessionTargetDifficulty;
-
-    if (newConsecutiveCorrect >= 2) {
-      newTargetDifficulty = Math.min(3, newTargetDifficulty + 1);
-      newConsecutiveCorrect = 0; // Reset after leveling up difficulty
-    } else if (newConsecutiveIncorrect >= 1) {
-      newTargetDifficulty = Math.max(1, newTargetDifficulty - 1);
-      newConsecutiveIncorrect = 0; // Reset after dropping difficulty
-    }
-
-    setSessionConsecutiveCorrect(newConsecutiveCorrect);
-    setSessionConsecutiveIncorrect(newConsecutiveIncorrect);
-    setSessionTargetDifficulty(newTargetDifficulty);
 
     // 2. Update Gamification State
     const xpGained = calculateXPGain(correct, timeSpentMs, profile.streak);
@@ -310,36 +276,63 @@ export default function App() {
     } catch (error) {
       handleFirestoreError(error, 'update', `users/${currentUser.uid}`);
     }
+
+    if (!correct) {
+      setConsecutiveHits(0);
+      const misses = consecutiveMisses + 1;
+      setConsecutiveMisses(misses);
+
+      // Adaptive Practice Engine (BKT + AI)
+      // Trigger AI remediation if repeated misses or if knowledge is plunging
+      if (misses >= 2 || (misses === 1 && nextProb < 0.3)) {
+        setIsGeneratingRemediation(true);
+        getRemediation(currentQ.conceptId, [currentQ]).then(res => {
+          if (res && res.reviewQuestion) {
+            // Inject the AI-generated remediation question directly into the session stack!
+            setCurrentSessionQuestions(prev => {
+              const copy = [...prev];
+              copy.splice(questionIndex + 1, 0, {
+                ...res.reviewQuestion,
+                id: 'remediation-' + Date.now(),
+                conceptId: currentQ.conceptId,
+                difficulty: 1, // Start easier
+                isRemediation: true,
+                remediationText: res.remediationText
+              });
+              return copy;
+            });
+            setConsecutiveMisses(0); // Reset after intervention
+          }
+          setIsGeneratingRemediation(false);
+        });
+      }
+    } else {
+      setConsecutiveMisses(0);
+      const hits = consecutiveHits + 1;
+      setConsecutiveHits(hits);
+      
+      if (hits >= 2 && nextProb > 0.7) {
+        setIsGeneratingRemediation(true); // Re-using loading state var for simplicity
+        getHarderQuestion(currentQ.conceptId, currentQ.difficulty).then(harderQ => {
+           if (harderQ) {
+              setCurrentSessionQuestions(prev => {
+                const copy = [...prev];
+                // Replace the next question with the harder generated one, or insert it
+                // We'll insert it to extend the session slightly with a challenge!
+                copy.splice(questionIndex + 1, 0, harderQ);
+                return copy;
+              });
+              setConsecutiveHits(0); // Reset after intervention
+           }
+           setIsGeneratingRemediation(false);
+        });
+      }
+    }
   };
 
   const handleNextQuestion = () => {
-    // We want 5 questions total per session, but cap it at the available pool size
-    if (questionIndex < Math.min(4, sessionQuestionPool.length - 1)) {
-      const usedIds = new Set(currentSessionQuestions.map(q => q.id));
-      const available = sessionQuestionPool.filter(q => !usedIds.has(q.id));
-      
-      const sortedAvailable = available.sort((a, b) => {
-        const diffMatchA = Math.abs((a.difficulty || 1) - sessionTargetDifficulty);
-        const diffMatchB = Math.abs((b.difficulty || 1) - sessionTargetDifficulty);
-        
-        const probA = profile?.knowledgeState[a.conceptId] || 0.5;
-        const probB = profile?.knowledgeState[b.conceptId] || 0.5;
-        
-        // Prioritize matching the target difficulty, then pick the lowest mastery concept
-        if (diffMatchA !== diffMatchB) {
-          return diffMatchA - diffMatchB;
-        }
-        return probA - probB;
-      });
-      
-      const nextQ = sortedAvailable[0] || sessionQuestionPool.find(q => !usedIds.has(q.id));
-      
-      if (nextQ) {
-        setCurrentSessionQuestions(prev => [...prev, nextQ]);
-        setQuestionIndex(i => i + 1);
-      } else {
-        setAppState('SESSION_COMPLETE');
-      }
+    if (questionIndex < currentSessionQuestions.length - 1) {
+      setQuestionIndex(i => i + 1);
     } else {
       setAppState('SESSION_COMPLETE');
     }
@@ -568,6 +561,7 @@ export default function App() {
               sessionStartTime={sessionStartTime}
               onAnswer={handleAnswer}
               onNext={handleNextQuestion}
+              isGenerating={isGeneratingRemediation}
             />
           </motion.div>
         );

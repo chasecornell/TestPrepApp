@@ -58,6 +58,8 @@ export interface Question {
   strategyTip: string;
   trickPattern?: string;
   syntheticDisclosed: boolean;
+  isRemediation?: boolean;
+  remediationText?: string;
 }
 
 export interface ProgressEntry {

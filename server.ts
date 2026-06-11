@@ -69,6 +69,92 @@ app.post("/api/questions/enrich", async (req, res) => {
   }
 });
 
+app.post("/api/questions/remediate", async (req, res) => {
+  try {
+    const { concept, recentMistakes } = req.body;
+    
+    const prompt = `
+      You are an expert tutor. The student is struggling with the concept: "${concept}".
+      They recently missed these questions:
+      ${recentMistakes.map((q: any) => `- ${q.text} (Student picked wrong answer)`).join('\n')}
+      
+      Generate a follow-up remediation mini-lesson and a simpler review question to help them understand.
+      
+      Respond in JSON format.
+    `;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            remediationText: { type: Type.STRING, description: "A brief, encouraging explanation of the concept identifying where they likely went wrong." },
+            reviewQuestion: {
+              type: Type.OBJECT,
+              properties: {
+                text: { type: Type.STRING },
+                options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                correctAnswerIndex: { type: Type.INTEGER },
+                explanation: { type: Type.STRING },
+                strategyTip: { type: Type.STRING },
+              },
+              required: ["text", "options", "correctAnswerIndex", "explanation", "strategyTip"]
+            }
+          },
+          required: ["remediationText", "reviewQuestion"],
+        },
+      },
+    });
+
+    res.json(JSON.parse(result.text));
+  } catch (error) {
+    console.error("Gemini Remediation Error:", error);
+    res.status(500).json({ error: "Failed to generate remediation" });
+  }
+});
+
+app.post("/api/questions/generate-harder", async (req, res) => {
+  try {
+    const { concept, currentDifficulty } = req.body;
+    
+    const prompt = `
+      You are an expert tutor. The student is excelling at the concept: "${concept}" and answering difficulty level ${currentDifficulty} questions easily. 
+      
+      Generate a brand new, harder question (level ${currentDifficulty + 1}) to challenge them.
+      
+      Respond in JSON format.
+    `;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            text: { type: Type.STRING },
+            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+            correctAnswerIndex: { type: Type.INTEGER },
+            explanation: { type: Type.STRING },
+            strategyTip: { type: Type.STRING },
+            trickPattern: { type: Type.STRING },
+          },
+          required: ["text", "options", "correctAnswerIndex", "explanation", "strategyTip", "trickPattern"]
+        },
+      },
+    });
+
+    res.json(JSON.parse(result.text));
+  } catch (error) {
+    console.error("Gemini Generation Error:", error);
+    res.status(500).json({ error: "Failed to generate harder question" });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

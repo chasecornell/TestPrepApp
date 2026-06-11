@@ -34,6 +34,12 @@ service cloud.firestore {
           && data.uid == request.auth.uid
           && data.email is string && data.email.size() <= 256
           && (data.get('displayName', '') is string && data.get('displayName', '').size() <= 128)
+          && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 512)
+          && (data.get('gender', '') is string && data.get('gender', '').size() <= 128)
+          && (data.get('gpa', 0.0) is number)
+          && (data.get('preScores', {}) is map)
+          && (data.get('classesTaken', []) is list)
+          && (data.get('knowledgeState', {}) is map)
           && (data.get('streak', 0) is int)
           && (data.get('streakFreezeCount', 0) is int)
           && (data.get('xp', 0) is int)
@@ -43,7 +49,8 @@ service cloud.firestore {
           && (data.get('badges', []) is list)
           && (data.get('mistakeBank', []) is list)
           && (data.get('completedLessons', []) is list)
-          && (data.get('totalQuestionsCompleted', 0) is int);
+          && (data.get('totalQuestionsCompleted', 0) is int)
+          && (data.get('lastActive', '') is string && data.get('lastActive', '').size() <= 64);
     }
 
     function isValidProgress(data) {
@@ -75,7 +82,7 @@ service cloud.firestore {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if isOwner(userId) && isValidUser(incoming())
-                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'gender', 'gpa', 'preScores', 'classesTaken', 'knowledgeState', 'streak', 'streakFreezeCount', 'xp', 'level', 'dailyGoal', 'dailyProgress', 'badges', 'mistakeBank', 'completedLessons', 'totalQuestionsCompleted', 'lastActive']);
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'gender', 'gpa', 'preScores', 'classesTaken', 'knowledgeState', 'streak', 'streakFreezeCount', 'xp', 'level', 'dailyGoal', 'dailyProgress', 'badges', 'mistakeBank', 'completedLessons', 'totalQuestionsCompleted', 'lastActive']);
       allow delete: if false; // Users shouldn't delete profiles via client easily
     }
 
